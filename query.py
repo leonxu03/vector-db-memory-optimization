@@ -1,7 +1,7 @@
 """
 Usage:
-    python test_collection.py                              # sift1m_baseline
-    python test_collection.py --collection sift1m_pq_x4    # TODO: needs to be added
+    python query.py                              # defaults to "sift1m_baseline" dataset
+    python query.py --collection sift1m_pq_x4    # TODO: needs to be added
 """
 
 import argparse

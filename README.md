@@ -17,3 +17,14 @@ Please comment/uncomment the interested quantization collections BEFORE running 
 ```Setup Collections (please check which ones you want to bring up)
 python main.py
 ```
+
+# Run Query Script
+```
+python query.py [flags]
+```
+
+
+####  Flags
+```
+--collection string           Optional. Supply a Qdrant collection name. Defaults to 'sift1m_baseline'
+```
