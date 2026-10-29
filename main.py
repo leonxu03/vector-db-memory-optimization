@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Idempotently create several SIFT1M collections (one per quantization) and load them."""
 
+import argparse
 import os
 import struct
 import sys
@@ -23,10 +24,39 @@ QUANTIZATION_JOBS = {
     # 1. Baseline: No compression
     "sift1m_baseline": None,
 
-    # TODO: 2. Scalar Quantization
+    # 2. Product Quantization
+    "pq_x4": models.ProductQuantization(
+        product=models.ProductQuantizationConfig(
+            compression=models.CompressionRatio.X4,
+        )
+    ),
+    "pq_x8": models.ProductQuantization(
+        product=models.ProductQuantizationConfig(
+            compression=models.CompressionRatio.X8,
+        )
+    ),
+    "pq_x16": models.ProductQuantization(
+        product=models.ProductQuantizationConfig(
+            compression=models.CompressionRatio.X16,
+        )
+    ),
+    "pq_x32": models.ProductQuantization(
+        product=models.ProductQuantizationConfig(
+            compression=models.CompressionRatio.X32,
+        )
+    ),
+    "pq_x64": models.ProductQuantization(
+        product=models.ProductQuantizationConfig(
+            compression=models.CompressionRatio.X64,
+        )
+    ),
 
-    # TODO: 3. Product Quantization
-
+    "scalar": models.ScalarQuantization(
+        scalar=models.ScalarQuantizationConfig(
+            type=models.ScalarType.INT8,
+            quantile=0.99,
+        )
+    )
     # TODO: 4. Binary Quantization
 }
 
@@ -96,7 +126,7 @@ def load_collection(client, collection_name):
 
     vectors = tqdm(stream_fvecs(FVECS_FILE_PATH), total=EXPECTED_COUNT,
                    desc=f"Uploading {collection_name}")
-    client.upload_collection(           # one call; the client batches internally
+    client.upload_collection(
         collection_name=collection_name,
         vectors=vectors,
         ids=count(),
@@ -111,21 +141,30 @@ def load_collection(client, collection_name):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--all", action="store_true")
+    group.add_argument("--quantization", choices=QUANTIZATION_JOBS.keys())
+    args = parser.parse_args()
+
     if not os.path.exists(FVECS_FILE_PATH):
         raise StepError(f"Could not find SIFT1M file at '{FVECS_FILE_PATH}'.")
-
 
     client = QdrantClient(url=QDRANT_URL)
     client.get_collections()
 
-    for name, quant in QUANTIZATION_JOBS.items():
+    jobs = QUANTIZATION_JOBS if args.all else {
+        args.quantization: QUANTIZATION_JOBS[args.quantization]
+    }
+
+    for name, quant in jobs.items():
         result = create_collection_if_not_exists(client, name, quant)
         print(f"Collection {name}: {result}")
         result = load_collection(client, name)
         print(f"Upload result: {result}")
 
-    print("\nSUCCESS: all collections are ready. Verify with:\n")
-    for name in QUANTIZATION_JOBS:
+    print("\nSUCCESS: selected collections are ready. Verify with:\n")
+    for name in jobs:
         print(f"curl -s {QDRANT_URL}/collections/{name} | python -m json.tool")
         print(f"curl -s -X POST {QDRANT_URL}/collections/{name}/points/count "
               f"-H 'Content-Type: application/json' -d '{{\"exact\": true}}'\n")
