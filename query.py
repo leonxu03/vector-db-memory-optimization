@@ -1,7 +1,7 @@
 """
 Usage:
     python query.py                                     # defaults to "sift1m_baseline" dataset
-    python query.py --collection <collection_name>   
+    python query.py --c <collection_name>   
 """
 
 import argparse
@@ -70,7 +70,7 @@ def run_experiment(client, collection, queries, groundtruth):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--collection", default=DEFAULT_COLLECTION,
+    parser.add_argument("--c", default=DEFAULT_COLLECTION,
                         help=f"Qdrant collection to test (default: {DEFAULT_COLLECTION})")
     args = parser.parse_args()
 
@@ -81,15 +81,15 @@ def main():
                         f"got {len(queries)} and {len(groundtruth)}.")
 
     client = QdrantClient(url=QDRANT_URL)
-    if not client.collection_exists(args.collection):
-        raise StepError(f"Collection '{args.collection}' does not exist. Run main.py first.")
-    count = client.count(args.collection, exact=True).count
+    if not client.collection_exists(args.c):
+        raise StepError(f"Collection '{args.c}' does not exist. Run main.py first.")
+    count = client.count(args.c, exact=True).count
     if count != EXPECTED_POINTS:
-        raise StepError(f"'{args.collection}' holds {count} points, expected {EXPECTED_POINTS}.")
+        raise StepError(f"'{args.c}' holds {count} points, expected {EXPECTED_POINTS}.")
 
-    latencies, recall = run_experiment(client, args.collection, queries, groundtruth)
+    latencies, recall = run_experiment(client, args.c, queries, groundtruth)
 
-    print(f"\nCollection:   {args.collection}")
+    print(f"\nCollection:   {args.c}")
     print(f"Queries:      {len(queries)} (top-{TOP_K}, Euclidean)")
     print(f"Recall@{TOP_K}:    {recall:.2f}%")
     print(f"Avg latency:  {latencies.mean():.3f} ms")
