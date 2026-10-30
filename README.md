@@ -20,7 +20,7 @@ python main.py [flags]
 
 ####  Flags
 ```
---quantization string           Supply a Qdrant quantization method name.
+--c string           Supply a Qdrant QUANTIZATION_JOBS name (see main.py)
 ```
 
 # Run Query Script
@@ -31,7 +31,7 @@ python query.py [flags]
 
 ####  Flags
 ```
---collection string           Optional. Supply a Qdrant collection name. Defaults to 'sift1m_baseline'
+--c string           Optional. Supply a Qdrant collection name. Defaults to 'sift1m_baseline'
 ```
 
 # Qdrant local API commands
@@ -56,6 +56,7 @@ If your default shell is:
 | `qcount --c <name>` | Show exact point count | `POST /collections/<name>/points/count` |
 | `qdelete --c <name>` | Delete a collection (asks for `y` to confirm) | `DELETE /collections/<name>` |
 | `qmemall` | Show the total memory summary for every collection | `GET /collections` + `/memory` for each |
+| `qmemtable --c <name>` | Show memory usage for a collection (disk, RAM, and page cache per component) in table format | `GET /collections/<name>` |
 
 ### Examples
 
