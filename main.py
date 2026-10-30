@@ -23,6 +23,7 @@ PARALLEL = 2
 QUANTIZATION_JOBS = {
     # 1. Baseline: No compression
     "sift1m_baseline": None,
+    "sift1m_baseline_cold": None,
 
     # 2. Product Quantization
     "pq_x4": models.ProductQuantization(
@@ -30,9 +31,21 @@ QUANTIZATION_JOBS = {
             compression=models.CompressionRatio.X4,
         )
     ),
+    "pq_x4_cold": models.ProductQuantization(
+        product=models.ProductQuantizationConfig(
+            compression=models.CompressionRatio.X4,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        )
+    ),
     "pq_x8": models.ProductQuantization(
         product=models.ProductQuantizationConfig(
             compression=models.CompressionRatio.X8,
+        )
+    ),
+    "pq_x8_cold": models.ProductQuantization(
+        product=models.ProductQuantizationConfig(
+            compression=models.CompressionRatio.X8,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
         )
     ),
     "pq_x16": models.ProductQuantization(
@@ -40,9 +53,21 @@ QUANTIZATION_JOBS = {
             compression=models.CompressionRatio.X16,
         )
     ),
+    "pq_x16_cold": models.ProductQuantization(
+        product=models.ProductQuantizationConfig(
+            compression=models.CompressionRatio.X16,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        )
+    ),
     "pq_x32": models.ProductQuantization(
         product=models.ProductQuantizationConfig(
             compression=models.CompressionRatio.X32,
+        )
+    ),
+    "pq_x32_cold": models.ProductQuantization(
+        product=models.ProductQuantizationConfig(
+            compression=models.CompressionRatio.X32,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
         )
     ),
     "pq_x64": models.ProductQuantization(
@@ -50,14 +75,125 @@ QUANTIZATION_JOBS = {
             compression=models.CompressionRatio.X64,
         )
     ),
+    "pq_x64_cold": models.ProductQuantization(
+        product=models.ProductQuantizationConfig(
+            compression=models.CompressionRatio.X64,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        )
+    ),
 
+    # 3. Scalar Quantization
     "scalar": models.ScalarQuantization(
         scalar=models.ScalarQuantizationConfig(
             type=models.ScalarType.INT8,
             quantile=0.99,
         )
-    )
-    # TODO: 4. Binary Quantization
+    ),
+    "scalar_cold": models.ScalarQuantization(
+        scalar=models.ScalarQuantizationConfig(
+            type=models.ScalarType.INT8,
+            quantile=0.99,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        )
+    ),
+
+    # 4. Binary Quantization
+    "binary1b": models.BinaryQuantization(
+        binary=models.BinaryQuantizationConfig(
+            encoding=models.BinaryQuantizationEncoding.ONE_BIT,
+        ),
+    ), 
+    "binary1b_cold": models.BinaryQuantization(
+        binary=models.BinaryQuantizationConfig(
+            encoding=models.BinaryQuantizationEncoding.ONE_BIT,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        ),
+    ), 
+
+    "binary1.5b": models.BinaryQuantization(
+        binary=models.BinaryQuantizationConfig(
+            encoding=models.BinaryQuantizationEncoding.ONE_AND_HALF_BITS,
+        ),
+    ),
+    "binary1.5b_cold": models.BinaryQuantization(
+        binary=models.BinaryQuantizationConfig(
+            encoding=models.BinaryQuantizationEncoding.ONE_AND_HALF_BITS,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        ),
+    ),
+
+    "binary2b": models.BinaryQuantization(
+        binary=models.BinaryQuantizationConfig(
+            encoding=models.BinaryQuantizationEncoding.TWO_BITS,
+        ), 
+    ),
+    "binary2b_cold": models.BinaryQuantization(
+        binary=models.BinaryQuantizationConfig(
+            encoding=models.BinaryQuantizationEncoding.TWO_BITS,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        ), 
+    ),
+
+    # 5. TurboQuantization
+    "tq8b": models.TurboQuantization(
+        turbo=models.TurboQuantQuantizationConfig(
+            bits=models.TurboQuantBitSize.BITS8,
+        ),
+    ),
+    "tq8b_cold": models.TurboQuantization(
+        turbo=models.TurboQuantQuantizationConfig(
+            bits=models.TurboQuantBitSize.BITS8,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        ),
+    ),
+
+    "tq4b": models.TurboQuantization(
+        turbo=models.TurboQuantQuantizationConfig(
+            bits=models.TurboQuantBitSize.BITS4,
+        ),
+    ),
+    "tq4b_cold": models.TurboQuantization(
+        turbo=models.TurboQuantQuantizationConfig(
+            bits=models.TurboQuantBitSize.BITS4,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        ),
+    ),
+
+    "tq2b": models.TurboQuantization(
+        turbo=models.TurboQuantQuantizationConfig(
+            bits=models.TurboQuantBitSize.BITS2,
+        ),
+    ),
+    "tq2b_cold": models.TurboQuantization(
+        turbo=models.TurboQuantQuantizationConfig(
+            bits=models.TurboQuantBitSize.BITS2,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        ),
+    ),
+
+    "tq1.5b": models.TurboQuantization(
+        turbo=models.TurboQuantQuantizationConfig(
+            bits=models.TurboQuantBitSize.BITS1_5,
+        ),
+    ),
+    "tq1.5b_cold": models.TurboQuantization(
+        turbo=models.TurboQuantQuantizationConfig(
+            bits=models.TurboQuantBitSize.BITS1_5,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        ),
+    ),
+
+    "tq1b": models.TurboQuantization(
+        turbo=models.TurboQuantQuantizationConfig(
+            bits=models.TurboQuantBitSize.BITS1,
+        ),
+    ),
+    "tq1b_cold": models.TurboQuantization(
+        turbo=models.TurboQuantQuantizationConfig(
+            bits=models.TurboQuantBitSize.BITS1,
+            memory=models.Memory.PINNED, # keep quantized vectors in RAM
+        ),
+    ),
 }
 
 
@@ -90,11 +226,16 @@ def _quant_name(q):
 
 
 def create_collection_if_not_exists(client, collection_name, quantization_config):
-    if not client.collection_exists(collection_name):
+    if "cold" in collection_name:
+        vector_cfg = models.VectorParams(size=DIM, distance=DISTANCE, memory=models.Memory.COLD)
+    else:
+        vector_cfg = models.VectorParams(size=DIM, distance=DISTANCE)
+
+    if not client.collection_exists(collection_name):        
         try:
             client.create_collection(
                 collection_name=collection_name,
-                vectors_config=models.VectorParams(size=DIM, distance=DISTANCE),
+                vectors_config=vector_cfg,
                 quantization_config=quantization_config,
             )
             return "created"
@@ -144,7 +285,7 @@ def main():
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--all", action="store_true")
-    group.add_argument("--quantization", choices=QUANTIZATION_JOBS.keys())
+    group.add_argument("--c", choices=QUANTIZATION_JOBS.keys())
     args = parser.parse_args()
 
     if not os.path.exists(FVECS_FILE_PATH):
@@ -154,7 +295,7 @@ def main():
     client.get_collections()
 
     jobs = QUANTIZATION_JOBS if args.all else {
-        args.quantization: QUANTIZATION_JOBS[args.quantization]
+        args.c: QUANTIZATION_JOBS[args.c]
     }
 
     for name, quant in jobs.items():
@@ -163,11 +304,7 @@ def main():
         result = load_collection(client, name)
         print(f"Upload result: {result}")
 
-    print("\nSUCCESS: selected collections are ready. Verify with:\n")
-    for name in jobs:
-        print(f"curl -s {QDRANT_URL}/collections/{name} | python -m json.tool")
-        print(f"curl -s -X POST {QDRANT_URL}/collections/{name}/points/count "
-              f"-H 'Content-Type: application/json' -d '{{\"exact\": true}}'\n")
+    print("\nSUCCESS: selected collections are ready")
 
 
 if __name__ == "__main__":
