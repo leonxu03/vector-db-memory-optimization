@@ -8,19 +8,52 @@ Run setup script
 source ./setup.sh
 ```
 
+`setup.sh` installs Docker, starts the Qdrant container, and installs these Python dependencies into `.venv`:
+
+| Package | Used by |
+|---|---|
+| `qdrant-client` | `main.py`, `query.py` |
+| `tqdm` | progress bars |
+| `matplotlib` | `monitor_query.py` graphs |
+
+To install them manually:
+
+```
+pip install qdrant-client tqdm matplotlib
+```
+
 # Dataset Setup
-Due to GitHub's restrictions on allowed uploaded file sizes, please see the "Release" section of repo and downloaded datasets tagged v1.0.0. Put those 4 files into the `/dataset` folder
+Due to GitHub's restrictions on allowed uploaded file sizes, please see the "Release" section of repo and download datasets tagged v1.0.0. Put those 4 files into the `/dataset` folder
 
 # Create and Populate Collections
-Please comment/uncomment the interested quantization collections BEFORE running this script (currently set to only create baseline collection)
+Creates and loads all requested collections in parallel (one process each), then waits until every one is green before exiting. Collections that already exist and are fully loaded are skipped. If any collection fails, the others still finish, and the script lists the failures and exits with code 1.
 
-```Setup Collections (please check which ones you want to bring up)
-python main.py [flags]
+Once every collection is green, the script restarts the `qdrant` Docker container, waits for it to be ready, drops the OS page cache (`sync; echo 3 > /proc/sys/vm/drop_caches`), and prints `qmemtable --c <name>` for each collection, so you can see memory use from a cold start. This step uses `sudo` and needs `jq`.
+
+```
+qcreate [flags]
 ```
 
 ####  Flags
 ```
---c string           Supply a Qdrant QUANTIZATION_JOBS name (see main.py)
+--all                Create every collection in QUANTIZATION_JOBS (see main.py)
+--c name [name ...]  Create one or more QUANTIZATION_JOBS collections, in parallel
+```
+One of `--all` or `--c` is required.
+
+Collection names (`pq_x4` style uses Qdrant's default memory setting; `4x_pq` style keeps quantized vectors pinned in RAM):
+
+| Method | Names |
+|---|---|
+| None | `baseline` |
+| Product | `pq_x4` `4x_pq` `pq_x8` `8x_pq` `pq_x16` `16x_pq` `pq_x32` `32x_pq` `pq_x64` `64x_pq` |
+| Scalar | `scalar` `4x_scalar` |
+| Binary | `binary1b` `32x_binary` `binary1.5b` `21x_binary` `binary2b` `16x_binary` |
+| TurboQuant | `tq8b` `4x_tq` `tq4b` `8x_tq` `tq2b` `16x_tq` `tq1.5b` `21x_tq` `tq1b` `32x_tq` |
+
+```
+python main.py --c baseline pq_x4 4x_scalar
+qcreate --all
 ```
 
 # Run Query Script
@@ -31,7 +64,61 @@ python query.py [flags]
 
 ####  Flags
 ```
---c string           Optional. Supply a Qdrant collection name. Defaults to 'sift1m_baseline'
+--c name [name ...]  Optional. One or more Qdrant collection names, queried in the order given. Defaults to 'sift1m_baseline'
+--batch-size int     Optional. Queries per request: 1, 10, 100, 1000 or 10000. Defaults to 1 (sequential)
+--cooldown float     Optional. Seconds to wait between collections. Defaults to 30
+--progress-file path Optional. Write 'completed/total' queries to this file while running (used by monitor_query.py)
+--no-csv             Optional. Don't append results to results/query_results.csv (used by cachegrind.py)
+--no-restart         Optional. Skip the Qdrant restart and page cache drop before each collection (monitor_query.py does its own cold start and passes this; cachegrind.py passes it too)
+```
+
+Before each collection, `query.py` restarts the `qdrant` Docker container and checks Qdrant  `/readyz`, then checks the collection still holds all its points and drops the OS page cache (`sync; echo 3 > /proc/sys/vm/drop_caches`). Every collection is queried from a cold start. This uses `sudo`, and the script stops with an error if any step fails.
+
+Each collection appends one row to `results/query_results.csv` (recall, per-query and per-request latency mean/median/P95/P99, total time, QPS). Per-query latency is the request time divided by the batch size.
+
+```
+python query.py --c pq_x4 pq_x8 scalar --batch-size 100
+```
+
+# Run Monitored Query
+Runs `query.py` for each collection and samples resource usage before, during and after it, then saves a graph for each metric with its peak marked. Collections run one after another, with `--cooldown` seconds of rest in between.
+
+```
+python monitor_query.py [flags]
+```
+
+####  Flags
+```
+--c name [name ...]  Optional. One or more Qdrant collections, monitored in the order given. Defaults to 'sift1m_baseline'
+--batch-size int     Optional. Queries per request, passed to query.py: 1, 10, 100, 1000 or 10000. Defaults to 1
+--cooldown float     Optional. Seconds to wait between collections. Defaults to 30
+--interval float     Optional. Sampling interval in seconds. Defaults to 0.5
+--out-dir string     Optional. Parent folder for results. Defaults to 'results'
+--no-restart         Optional. Skip the Qdrant restart and page cache drop before each collection
+```
+
+Before sampling each collection, the script restarts the `qdrant` container, checks it's running and ready, then drops the OS page cache. Every run starts from flushed cache baseline. `query.py` then runs with `--no-restart`, so nothing restarts mid-recording.
+
+Output goes to `results/<YYYYMMDD>/<collection>[_b<batch>]_<timestamp>/` (one folder per day; `_b<batch>` only when `--batch-size` is above 1):
+
+| File | Metric | Source |
+|---|---|---|
+| `memory.png` | RAM and page cache (MB), stacked per structure | `GET /collections/<name>/memory` → `total.ram_bytes`, `total.cached_bytes` |
+| `storage.png` | Disk used (MB), stacked per structure | `GET /collections/<name>/memory` → `total.disk_bytes` |
+| `block_io.png` | Disk read and write operations (cumulative count) | Container cgroup `io.stat` → `rios`, `wios` |
+| `samples.csv` | Raw samples | |
+
+The x-axis is query completion (0–100% of queries answered, from `query.py --progress-file`), so runs of different collections line up. The 2 seconds of idle sampling before and after the run are drawn as fixed-width sections on either side.
+
+Notes:
+- The script runs `sudo -n docker inspect` once to find the `qdrant` container, so it needs passwordless sudo for Docker, or your user in the `docker` group.
+- `docker stats` only reports Block I/O in bytes, so operation counts are read from the container's cgroup file `io.stat`, which is the same kernel data `docker stats` uses.
+- Block I/O covers the whole Qdrant container, not just one collection. On a warm run (data already cached in RAM) it may stay flat at 0, meaning no disk I/O happened.
+
+#### Example
+```
+python monitor_query.py --c pq_x4
+python monitor_query.py --c 4x_pq 4x_scalar 4x_tq --batch-size 100
 ```
 
 # Qdrant local API commands
@@ -56,7 +143,8 @@ If your default shell is:
 | `qcount --c <name>` | Show exact point count | `POST /collections/<name>/points/count` |
 | `qdelete --c <name>` | Delete a collection (asks for `y` to confirm) | `DELETE /collections/<name>` |
 | `qmemall` | Show the total memory summary for every collection | `GET /collections` + `/memory` for each |
-| `qmemtable --c <name>` | Show memory usage for a collection (disk, RAM, and page cache per component) in table format | `GET /collections/<name>` |
+| `qcreate [flags]` | Same as `python main.py [flags]` (create and populate collections); runs from the project directory | — |
+| `qmemtable --c <name>` | Show memory usage for a collection (disk, RAM, and page cache per component) in table format. Also accepts `qmem`-style JSON piped in | `GET /collections/<name>/memory` |
 
 ### Examples
 
@@ -66,3 +154,5 @@ If your default shell is:
     qcount --c pq_x8
     qdelete --c pq_x16
     qmemall
+    qmemtable --c 4x_pq
+    qcreate --c baseline pq_x4
