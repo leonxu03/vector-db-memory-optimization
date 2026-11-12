@@ -41,18 +41,20 @@ qcreate [flags]
 ```
 One of `--all` or `--c` is required.
 
-Collection names (`pq_x4` style uses Qdrant's default memory setting; `4x_pq` style keeps quantized vectors pinned in RAM):
+Collection names are `<compression>x_<method>`. Quantized vectors are pinned in RAM and the original vectors are stored cold on disk (the baseline's original vectors are cold too):
 
 | Method | Names |
 |---|---|
 | None | `baseline` |
-| Product | `pq_x4` `4x_pq` `pq_x8` `8x_pq` `pq_x16` `16x_pq` `pq_x32` `32x_pq` `pq_x64` `64x_pq` |
-| Scalar | `scalar` `4x_scalar` |
-| Binary | `binary1b` `32x_binary` `binary1.5b` `21x_binary` `binary2b` `16x_binary` |
-| TurboQuant | `tq8b` `4x_tq` `tq4b` `8x_tq` `tq2b` `16x_tq` `tq1.5b` `21x_tq` `tq1b` `32x_tq` |
+| Product | `4x_pq` `8x_pq` `16x_pq` `32x_pq` `64x_pq` |
+| Scalar | `4x_scalar` |
+| Binary | `32x_binary` `21x_binary` `16x_binary` |
+| TurboQuant | `4x_tq` `8x_tq` `16x_tq` `21x_tq` `32x_tq` |
+
+To add a variant, add a line to `QUANTIZATION_JOBS` in `main.py`, e.g. `"pq_x4": product(Ratio.X4, pinned=False)` for product quantization with Qdrant's default memory setting.
 
 ```
-python main.py --c baseline pq_x4 4x_scalar
+python main.py --c baseline 4x_pq 4x_scalar
 qcreate --all
 ```
 
@@ -77,7 +79,7 @@ Before each collection, `query.py` restarts the `qdrant` Docker container and ch
 Each collection appends one row to `results/query_results.csv` (recall, per-query and per-request latency mean/median/P95/P99, total time, QPS). Per-query latency is the request time divided by the batch size.
 
 ```
-python query.py --c pq_x4 pq_x8 scalar --batch-size 100
+python query.py --c 4x_pq 8x_pq 4x_scalar --batch-size 100
 ```
 
 # Run Monitored Query
@@ -117,7 +119,7 @@ Notes:
 
 #### Example
 ```
-python monitor_query.py --c pq_x4
+python monitor_query.py --c 4x_pq
 python monitor_query.py --c 4x_pq 4x_scalar 4x_tq --batch-size 100
 ```
 
@@ -150,9 +152,9 @@ If your default shell is:
 
     qlist
     qinfo --c sift1m_baseline
-    qmem --c pq_x4
-    qcount --c pq_x8
-    qdelete --c pq_x16
+    qmem --c 4x_pq
+    qcount --c 8x_pq
+    qdelete --c 16x_pq
     qmemall
     qmemtable --c 4x_pq
-    qcreate --c baseline pq_x4
+    qcreate --c baseline 4x_pq
