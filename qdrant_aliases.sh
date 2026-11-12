@@ -1,4 +1,15 @@
+
 Q_URL="${QDRANT_URL:-http://localhost:6333}"
+
+# project directory (where this file lives), works in bash and zsh
+if [ -n "$BASH_VERSION" ]; then
+  Q_PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+elif [ -n "$ZSH_VERSION" ]; then
+  eval 'Q_PROJECT_DIR="${${(%):-%x}:A:h}"'
+fi
+
+# same as `python main.py [flags]`, runnable from any directory
+qcreate() { (cd "$Q_PROJECT_DIR" && python main.py "$@"); }
 
 # parse --c <name> from args
 _qc() {
@@ -31,12 +42,14 @@ qmemall() {
 qmemtable() {
     local c json
 
-    # Read JSON from pipe, or query Qdrant directly
-    if [ -t 0 ]; then
+    # Query Qdrant when --c is given, otherwise read JSON from a pipe
+    if [ $# -gt 0 ]; then
         c=$(_qc "$@") || return 1
         json=$(curl -fsS "$Q_URL/collections/$c/memory") || return 1
-    else
+    elif [ ! -t 0 ]; then
         json=$(cat) || return 1
+    else
+        _qc; return 1
     fi
 
     printf '%s\n' "$json" | jq -r '
