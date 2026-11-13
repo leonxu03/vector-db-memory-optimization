@@ -1,2 +1,5 @@
 /.venv
 /qdrant_storage
+/results
+/__pycache*
+/dataset
