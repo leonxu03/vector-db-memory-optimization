@@ -25,7 +25,7 @@ if [ ! -d .venv ]; then
 fi
 
 .venv/bin/python -m pip install -q --upgrade pip
-.venv/bin/python -m pip install -q qdrant-client tqdm
+.venv/bin/python -m pip install -q qdrant-client tqdm matplotlib
 echo "=== SUCCESS: Installing Python deps ==="
 
 echo "=== TRY: Virtual environment activated ==="
