@@ -66,15 +66,15 @@ python query.py [flags]
 
 ####  Flags
 ```
---c name [name ...]  Optional. One or more Qdrant collection names, queried in the order given. Defaults to 'sift1m_baseline'
+--c name [name ...]  Optional. One or more Qdrant collection names, queried in the order given. Defaults to 'baseline'
 --batch-size int     Optional. Queries per request: 1, 10, 100, 1000 or 10000. Defaults to 1 (sequential)
 --cooldown float     Optional. Seconds to wait between collections. Defaults to 30
 --progress-file path Optional. Write 'completed/total' queries to this file while running (used by monitor_query.py)
---no-csv             Optional. Don't append results to results/query_results.csv (used by cachegrind.py)
---no-restart         Optional. Skip the Qdrant restart and page cache drop before each collection (monitor_query.py does its own cold start and passes this; cachegrind.py passes it too)
+--save-csv bool      Optional. true or false: append results to results/query_results.csv. Defaults to true (cachegrind.py passes false)
+--restart bool       Optional. true or false: restart Qdrant and drop the page cache before each collection. Defaults to true (monitor_query.py does its own cold start and passes false; cachegrind.py passes false too)
 ```
 
-Before each collection, `query.py` restarts the `qdrant` Docker container and checks Qdrant  `/readyz`, then checks the collection still holds all its points and drops the OS page cache (`sync; echo 3 > /proc/sys/vm/drop_caches`). Every collection is queried from a cold start. This uses `sudo`, and the script stops with an error if any step fails.
+Before each collection, `query.py` restarts the `qdrant` Docker container and checks Qdrant  `/readyz`, then drops the OS page cache (`sync; echo 3 > /proc/sys/vm/drop_caches`). Every collection is queried from a cold start. This uses `sudo`, and the script stops with an error if any step fails.
 
 Each collection appends one row to `results/query_results.csv` (recall, per-query and per-request latency mean/median/P95/P99, total time, QPS). Per-query latency is the request time divided by the batch size.
 
@@ -91,21 +91,21 @@ python monitor_query.py [flags]
 
 ####  Flags
 ```
---c name [name ...]  Optional. One or more Qdrant collections, monitored in the order given. Defaults to 'sift1m_baseline'
+--c name [name ...]  Optional. One or more Qdrant collections, monitored in the order given. Defaults to baseline'
 --batch-size int     Optional. Queries per request, passed to query.py: 1, 10, 100, 1000 or 10000. Defaults to 1
 --cooldown float     Optional. Seconds to wait between collections. Defaults to 30
 --interval float     Optional. Sampling interval in seconds. Defaults to 0.5
 --out-dir string     Optional. Parent folder for results. Defaults to 'results'
---no-restart         Optional. Skip the Qdrant restart and page cache drop before each collection
+--flush-cache bool   Optional. true or false: restart Qdrant and drop the page cache before each collection. Defaults to true
 ```
 
-Before sampling each collection, the script restarts the `qdrant` container, checks it's running and ready, then drops the OS page cache. Every run starts from flushed cache baseline. `query.py` then runs with `--no-restart`, so nothing restarts mid-recording.
+Before sampling each collection, the script restarts the `qdrant` container, checks it's running and ready, then drops the OS page cache. Every run starts from flushed cache baseline. `query.py` then runs with `--restart false`, so nothing restarts mid-recording.
 
 Output goes to `results/<YYYYMMDD>/<collection>[_b<batch>]_<timestamp>/` (one folder per day; `_b<batch>` only when `--batch-size` is above 1):
 
 | File | Metric | Source |
 |---|---|---|
-| `memory.png` | RAM and page cache (MB), stacked per structure | `GET /collections/<name>/memory` → `total.ram_bytes`, `total.cached_bytes` |
+| `memory.png` | Pinned (held in RAM) and page cache (MB), stacked per structure | `GET /collections/<name>/memory` → `total.ram_bytes`, `total.cached_bytes` |
 | `storage.png` | Disk used (MB), stacked per structure | `GET /collections/<name>/memory` → `total.disk_bytes` |
 | `block_io.png` | Disk read and write operations (cumulative count) | Container cgroup `io.stat` → `rios`, `wios` |
 | `samples.csv` | Raw samples | |
@@ -151,7 +151,7 @@ If your default shell is:
 ### Examples
 
     qlist
-    qinfo --c sift1m_baseline
+    qinfo --c baseline
     qmem --c 4x_pq
     qcount --c 8x_pq
     qdelete --c 16x_pq
